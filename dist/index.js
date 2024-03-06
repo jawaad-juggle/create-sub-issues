@@ -29005,15 +29005,15 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.run = exports.getSubActions = void 0;
+exports.run = exports.updateIssueBody = exports.createSubTasks = exports.getSubActions = void 0;
 const core = __importStar(__nccwpck_require__(2186));
 const github = __importStar(__nccwpck_require__(5438));
 /**
  * Get the list of the sub actions for the main issue
  * @returns {Promise<string[]>} The list of sub actions.
  */
-async function getSubActions() {
-    const issueBody = github.context.payload.issue.body;
+async function getSubActions(context) {
+    const issueBody = context.payload.issue.body;
     if (issueBody?.length === 0) {
         core.error('No tasks found in issue body');
         core.ExitCode.Success;
@@ -29032,6 +29032,19 @@ async function getSubActions() {
     return uncheckedTasks;
 }
 exports.getSubActions = getSubActions;
+async function createSubTasks(client, subtasks) {
+    const subTasks = await Promise.all(subtasks.map(async (subtask) => {
+        const issue = client.rest.issues.create({
+            owner: github.context.repo.owner,
+            repo: github.context.repo.repo,
+            title: subtask,
+            body: `This issue was created from the main issue: #${github.context.issue.number}`
+        });
+        return issue;
+    }));
+    return subTasks;
+}
+exports.createSubTasks = createSubTasks;
 /**
  * Update the issue body by removing the current task list and adding a new task list with the names and URLs of the new issues.
  * @param context the context of the action.
@@ -29051,13 +29064,14 @@ async function updateIssueBody(newIssues, context, client) {
     const finalBody = `${updatedBody}\n\n${newTaskList}`;
     // Update the issue body
     await client.rest.issues.update({
-        owner: context.payload.repo.owner,
-        repo: context.payload.repo.repo,
+        owner: context.issue.owner,
+        repo: context.issue.repo,
         issue_number: context.payload.issue.number,
         body: finalBody
     });
     return true;
 }
+exports.updateIssueBody = updateIssueBody;
 /**
  * The main function for the action.
  * @returns {Promise<void>} Resolves when the action is complete.
@@ -29065,7 +29079,7 @@ async function updateIssueBody(newIssues, context, client) {
 async function run() {
     try {
         // Get the list of sub actions to create issues for
-        const subtasks = await getSubActions();
+        const subtasks = await getSubActions(github.context);
         if (subtasks.length === 0) {
             core.info('No subtasks found to create issues for');
             core.ExitCode.Success;
@@ -29074,15 +29088,7 @@ async function run() {
         const ghToken = core.getInput('github_token');
         const ghClient = github.getOctokit(ghToken);
         // Create an issue for each sub action
-        const newIssues = await Promise.all(subtasks.map(async (subtask) => {
-            const issue = ghClient.rest.issues.create({
-                owner: github.context.repo.owner,
-                repo: github.context.repo.repo,
-                title: subtask,
-                body: `This issue was created from the main issue: #${github.context.issue.number}`
-            });
-            return issue;
-        }));
+        const newIssues = await createSubTasks(ghClient, subtasks);
         // Update the issue body with the new task list
         const updatedBody = await updateIssueBody(newIssues, github.context, ghClient);
         core.setOutput('new_issues', newIssues);

@@ -9,8 +9,8 @@ import { Api } from '@octokit/plugin-rest-endpoint-methods/dist-types/types'
  * Get the list of the sub actions for the main issue
  * @returns {Promise<string[]>} The list of sub actions.
  */
-export async function getSubActions(): Promise<string[]> {
-  const issueBody: string | undefined = github.context.payload.issue!.body
+export async function getSubActions(context: Context): Promise<string[]> {
+  const issueBody: string | undefined = context.payload.issue!.body
 
   if (issueBody?.length === 0) {
     core.error('No tasks found in issue body')
@@ -34,6 +34,28 @@ export async function getSubActions(): Promise<string[]> {
   return uncheckedTasks
 }
 
+export async function createSubTasks(
+  client: Octokit &
+    Api & {
+      paginate: PaginateInterface
+    },
+  subtasks: string[]
+): Promise<any[]> {
+  const subTasks = await Promise.all(
+    subtasks.map(async (subtask: string) => {
+      const issue = client.rest.issues.create({
+        owner: github.context.repo.owner,
+        repo: github.context.repo.repo,
+        title: subtask,
+        body: `This issue was created from the main issue: #${github.context.issue.number}`
+      })
+      return issue
+    })
+  )
+
+  return subTasks
+}
+
 /**
  * Update the issue body by removing the current task list and adding a new task list with the names and URLs of the new issues.
  * @param context the context of the action.
@@ -41,7 +63,7 @@ export async function getSubActions(): Promise<string[]> {
  * @param client The Octokit client.
  * @returns {Boolean} whether the issue body was updated successfully.
  */
-async function updateIssueBody(
+export async function updateIssueBody(
   newIssues: any[],
   context: Context,
   client: Octokit &
@@ -78,7 +100,7 @@ async function updateIssueBody(
 export async function run(): Promise<void> {
   try {
     // Get the list of sub actions to create issues for
-    const subtasks = await getSubActions()
+    const subtasks = await getSubActions(github.context)
 
     if (subtasks.length === 0) {
       core.info('No subtasks found to create issues for')
@@ -90,17 +112,7 @@ export async function run(): Promise<void> {
     const ghClient = github.getOctokit(ghToken)
 
     // Create an issue for each sub action
-    const newIssues = await Promise.all(
-      subtasks.map(async (subtask: string) => {
-        const issue = ghClient.rest.issues.create({
-          owner: github.context.repo.owner,
-          repo: github.context.repo.repo,
-          title: subtask,
-          body: `This issue was created from the main issue: #${github.context.issue.number}`
-        })
-        return issue
-      })
-    )
+    const newIssues = await createSubTasks(ghClient, subtasks)
 
     // Update the issue body with the new task list
     const updatedBody = await updateIssueBody(
