@@ -63,8 +63,8 @@ async function updateIssueBody(
 
   // Update the issue body
   await client.rest.issues.update({
-    owner: context.payload.repo.owner,
-    repo: context.payload.repo.repo,
+    owner: context.repo.owner,
+    repo: context.repo.repo,
     issue_number: context.payload.issue!.number,
     body: finalBody
   })
