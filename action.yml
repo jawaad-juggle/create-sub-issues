@@ -1,6 +1,7 @@
-name: 'The name of your action here'
-description: 'Provide a description here'
-author: 'Your name or organization here'
+name: 'Create Sub Issues'
+description:
+  "Create sub issues based on the task list in the parent issue's body"
+author: 'Jawaad Khan'
 
 # Add your action's branding here. This will appear on the GitHub Marketplace.
 branding:
@@ -9,15 +10,17 @@ branding:
 
 # Define your inputs here.
 inputs:
-  milliseconds:
-    description: 'Your input description here'
+  github-token:
+    description: 'GitHub Token'
     required: true
-    default: '1000'
+  trigger-label:
+    description: 'The parent label to trigger the action'
+    required: true
 
 # Define your outputs here.
 outputs:
-  time:
-    description: 'Your output description here'
+  sub-issues:
+    description: 'List of the sub issues created'
 
 runs:
   using: node20
