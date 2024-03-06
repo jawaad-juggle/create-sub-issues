@@ -10,10 +10,10 @@ branding:
 
 # Define your inputs here.
 inputs:
-  github-token:
+  github_token:
     description: 'GitHub Token'
     required: true
-  trigger-label:
+  trigger_label:
     description: 'The parent label to trigger the action'
     required: true
 
